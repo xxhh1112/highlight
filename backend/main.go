@@ -443,7 +443,6 @@ func main() {
 			})
 			privateServer.Use(private.NewGraphqlOAuthValidator(privateResolver.Store))
 			privateServer.Use(htrace.NewGraphqlTracer(string(util.PrivateGraph)).WithRequestFieldLogging())
-			privateServer.Use(util.NewTracer(util.PrivateGraph))
 			privateServer.SetErrorPresenter(htrace.GraphQLErrorPresenter(string(util.PrivateGraph)))
 			privateServer.SetRecoverFunc(htrace.GraphQLRecoverFunc())
 			r.Handle("/",
@@ -479,7 +478,6 @@ func main() {
 					Resolvers: publicResolver,
 				}))
 			publicServer.Use(htrace.NewGraphqlTracer(string(util.PublicGraph)))
-			publicServer.Use(util.NewTracer(util.PublicGraph))
 			publicServer.SetErrorPresenter(htrace.GraphQLErrorPresenter(string(util.PublicGraph)))
 			publicServer.SetRecoverFunc(htrace.GraphQLRecoverFunc())
 			r.Handle("/",
