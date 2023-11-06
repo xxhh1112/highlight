@@ -3,6 +3,7 @@ package timeseries
 import (
 	"context"
 	"fmt"
+	hmetric "github.com/highlight/highlight/sdk/highlight-go/metric"
 	http2 "github.com/influxdata/influxdb-client-go/v2/api/http"
 	"os"
 	"sort"
@@ -14,8 +15,6 @@ import (
 	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/influxdata/influxdb-client-go/v2/domain"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/highlight-run/highlight/backend/hlog"
 )
 
 type Measurement string
@@ -256,9 +255,9 @@ func (i *InfluxDB) Write(ctx context.Context, bucket string, measurement Measure
 			w.Flush()
 		}
 	}
-	hlog.Incr("worker.influx.writeCount", nil, 1)
-	hlog.Histogram("worker.influx.writeMessageCount", float64(len(points)), nil, 1)
-	hlog.Histogram("worker.influx.writeSec", time.Since(start).Seconds(), nil, 1)
+	hmetric.Incr(ctx, "worker.influx.writeCount", nil, 1)
+	hmetric.Histogram(ctx, "worker.influx.writeMessageCount", float64(len(points)), nil, 1)
+	hmetric.Histogram(ctx, "worker.influx.writeSec", time.Since(start).Seconds(), nil, 1)
 }
 
 // GetSampledMeasurement returns the bucket and measurement to query depending on the time range

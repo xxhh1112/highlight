@@ -28,7 +28,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/highlight-run/go-resthooks"
 	"github.com/highlight-run/highlight/backend/clickhouse"
-	dd "github.com/highlight-run/highlight/backend/datadog"
 	highlightHttp "github.com/highlight-run/highlight/backend/http"
 	"github.com/highlight-run/highlight/backend/integrations"
 	kafkaqueue "github.com/highlight-run/highlight/backend/kafka-queue"
@@ -54,6 +53,7 @@ import (
 	"github.com/highlight/highlight/sdk/highlight-go"
 	hlog "github.com/highlight/highlight/sdk/highlight-go/log"
 	highlightChi "github.com/highlight/highlight/sdk/highlight-go/middleware/chi"
+	"github.com/highlight/highlight/sdk/highlight-go/trace"
 	e "github.com/pkg/errors"
 	"github.com/rs/cors"
 	"github.com/sendgrid/sendgrid-go"
@@ -258,18 +258,6 @@ func main() {
 		port = defaultPort
 	}
 
-	shouldLog := !util.IsDevOrTestEnv() && !util.IsOnPrem()
-	if shouldLog {
-		log.WithContext(ctx).Info("Running dd client setup process...")
-		if err := dd.Start(runtimeParsed); err != nil {
-			log.WithContext(ctx).Fatal(e.Wrap(err, "error starting dd clients with error"))
-		} else {
-			defer dd.Stop()
-		}
-	} else {
-		log.WithContext(ctx).Info("Excluding dd client setup process...")
-	}
-
 	db, err := model.SetupDB(ctx, os.Getenv("PSQL_DB"))
 	if err != nil {
 		log.WithContext(ctx).Fatalf("Error setting up DB: %v", err)
@@ -455,10 +443,10 @@ func main() {
 				Cache: lru.New(10000),
 			})
 			privateServer.Use(private.NewGraphqlOAuthValidator(privateResolver.Store))
-			privateServer.Use(highlight.NewGraphqlTracer(string(util.PrivateGraph)).WithRequestFieldLogging())
+			privateServer.Use(htrace.NewGraphqlTracer(string(util.PrivateGraph)).WithRequestFieldLogging())
 			privateServer.Use(util.NewTracer(util.PrivateGraph))
-			privateServer.SetErrorPresenter(highlight.GraphQLErrorPresenter(string(util.PrivateGraph)))
-			privateServer.SetRecoverFunc(highlight.GraphQLRecoverFunc())
+			privateServer.SetErrorPresenter(htrace.GraphQLErrorPresenter(string(util.PrivateGraph)))
+			privateServer.SetRecoverFunc(htrace.GraphQLRecoverFunc())
 			r.Handle("/",
 				privateServer,
 			)
@@ -498,10 +486,10 @@ func main() {
 				publicgen.Config{
 					Resolvers: publicResolver,
 				}))
-			publicServer.Use(highlight.NewGraphqlTracer(string(util.PublicGraph)))
+			publicServer.Use(htrace.NewGraphqlTracer(string(util.PublicGraph)))
 			publicServer.Use(util.NewTracer(util.PublicGraph))
-			publicServer.SetErrorPresenter(highlight.GraphQLErrorPresenter(string(util.PublicGraph)))
-			publicServer.SetRecoverFunc(highlight.GraphQLRecoverFunc())
+			publicServer.SetErrorPresenter(htrace.GraphQLErrorPresenter(string(util.PublicGraph)))
+			publicServer.SetRecoverFunc(htrace.GraphQLRecoverFunc())
 			r.Handle("/",
 				publicServer,
 			)

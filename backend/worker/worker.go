@@ -18,7 +18,6 @@ import (
 	"github.com/golang/snappy"
 	"github.com/highlight-run/highlight/backend/alerts"
 	parse "github.com/highlight-run/highlight/backend/event-parse"
-	"github.com/highlight-run/highlight/backend/hlog"
 	log_alerts "github.com/highlight-run/highlight/backend/jobs/log-alerts"
 	metric_monitor "github.com/highlight-run/highlight/backend/jobs/metric-monitor"
 	kafkaqueue "github.com/highlight-run/highlight/backend/kafka-queue"
@@ -37,6 +36,7 @@ import (
 	"github.com/highlight-run/highlight/backend/zapier"
 	"github.com/highlight-run/workerpool"
 	"github.com/highlight/highlight/sdk/highlight-go"
+	hmetric "github.com/highlight/highlight/sdk/highlight-go/metric"
 	"github.com/openlyinc/pointy"
 	"github.com/pkg/errors"
 	e "github.com/pkg/errors"
@@ -303,11 +303,13 @@ func (w *Worker) processPublicWorkerMessage(ctx context.Context, task *kafkaqueu
 			break
 		}
 		s, err := w.PublicResolver.InitializeSessionImpl(ctx, task.InitializeSession)
-		tags := []string{fmt.Sprintf("success:%t", err == nil)}
-		if s != nil {
-			tags = append(tags, fmt.Sprintf("secure_id:%q", s.SecureID), fmt.Sprintf("project_id:%d", s.ProjectID))
+		tags := []attribute.KeyValue{
+			attribute.Bool("success", err == nil),
 		}
-		hlog.Incr("worker.initializeSession.count", tags, 1)
+		if s != nil {
+			tags = append(tags, attribute.String("secure_id", s.SecureID), attribute.Int("project_id", s.ProjectID))
+		}
+		hmetric.Incr(ctx, "worker.initializeSession.count", tags, 1)
 		if err != nil {
 			log.WithContext(ctx).WithError(err).WithField("type", task.Type).Error("failed to process task")
 			return err
@@ -1062,7 +1064,7 @@ func (w *Worker) Start(ctx context.Context) {
 			sessions[i], sessions[j] = sessions[j], sessions[i]
 		})
 		// Sends a "count" metric to datadog so that we can see how many sessions are being queried.
-		hlog.Histogram("worker.sessionsQuery.sessionCount", float64(len(sessions)), nil, 1) //nolint
+		hmetric.Histogram(ctx, "worker.sessionsQuery.sessionCount", float64(len(sessions)), nil, 1) //nolint
 		sessionsSpan.Finish()
 		type SessionLog struct {
 			SessionID int
@@ -1124,7 +1126,7 @@ func (w *Worker) Start(ctx context.Context) {
 
 					return
 				}
-				hlog.Incr("sessionsProcessed", nil, 1)
+				hmetric.Incr(ctx, "sessionsProcessed", nil, 1)
 				span.Finish()
 			})
 		}
@@ -1605,6 +1607,6 @@ func reportProcessSessionCount(ctx context.Context, db *gorm.DB, lookbackPeriod,
 			log.WithContext(ctx).Error(e.Wrap(err, "error getting count of sessions to process"))
 			continue
 		}
-		hlog.Histogram("processSessionsCount", float64(count), nil, 1)
+		hmetric.Histogram(ctx, "processSessionsCount", float64(count), nil, 1)
 	}
 }
