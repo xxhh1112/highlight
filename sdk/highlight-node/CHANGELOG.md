@@ -1,5 +1,11 @@
 # @highlight-run/node
 
+## 3.6.3
+
+### Patch Changes
+
+-   66b94f3f7: change serialization for node to avoid reporting objects as the message
+
 ## 3.6.2
 
 ### Patch Changes
